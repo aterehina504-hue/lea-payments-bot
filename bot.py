@@ -1,7 +1,9 @@
+import os
 from aiogram import Bot, Dispatcher, types
 from aiogram.utils import executor
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-BOT_TOKEN = "ВСТАВЬ_СВОЙ_BOT_TOKEN"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 MAIN_BOT_URL = "https://t.me/leya_tocka_bot"  # основной бот
 
 bot = Bot(token=BOT_TOKEN)
@@ -28,30 +30,30 @@ GUIDES = {
         "title": "Нера — путь к женской силе",
         "description": "Энергия и проявленность 🔥\nРазовый доступ навсегда",
         "price": 1090
-    },    
+    },
     "all": {
         "title": "Все проводники — полный доступ",
         "description": (
             "Лея • Элира • Амира • Нера\n\n"
             "Полный доступ ко всем путям.\n"
-            "Навсегда 🤍",
+            "Навсегда 🤍"
+        ),
         "price": 1990
     }
-
 }
 
 # ---- /start ----
 @dp.message_handler(commands=["start"])
 async def start(message: types.Message):
-    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard = InlineKeyboardMarkup(row_width=1)
 
-   keyboard.add(
-    InlineKeyboardButton("🌷 Лея — 490 ⭐", callback_data="buy_leya"),
-    InlineKeyboardButton("🌸 Элира — 690 ⭐", callback_data="buy_elira"),
-    InlineKeyboardButton("🌼 Амира — 890 ⭐", callback_data="buy_amira"),
-    InlineKeyboardButton("🔥 Нера — 1090 ⭐", callback_data="buy_nera"),
-    InlineKeyboardButton("💎 Все проводники — 1990 ⭐", callback_data="buy_all"),
-)
+    keyboard.add(
+        InlineKeyboardButton("🌷 Лея — 490 ⭐", callback_data="buy_leya"),
+        InlineKeyboardButton("🌸 Элира — 690 ⭐", callback_data="buy_elira"),
+        InlineKeyboardButton("🌼 Амира — 890 ⭐", callback_data="buy_amira"),
+        InlineKeyboardButton("🔥 Нера — 1090 ⭐", callback_data="buy_nera"),
+        InlineKeyboardButton("💎 Все проводники — 1990 ⭐", callback_data="buy_all"),
+    )
 
     await message.answer(
         "💗 Оплата доступа\n\n"
@@ -87,16 +89,14 @@ async def pre_checkout(pre_checkout_query: types.PreCheckoutQuery):
 # ---- ПОСЛЕ ОПЛАТЫ ----
 @dp.message_handler(content_types=types.ContentType.SUCCESSFUL_PAYMENT)
 async def successful_payment(message: types.Message):
-    user_id = message.from_user.id
     payload = message.successful_payment.invoice_payload
-    guide_key = payload.replace("_access", "")  # leya / elira / amira / nera
+    guide_key = payload.replace("_access", "")
 
-    # deep link в основной бот
-    return_url = f"https://t.me/leya_tocka_bot?start={guide_key}"
+    return_url = f"{MAIN_BOT_URL}?start={guide_key}"
 
-    keyboard = types.InlineKeyboardMarkup()
+    keyboard = InlineKeyboardMarkup()
     keyboard.add(
-        types.InlineKeyboardButton(
+        InlineKeyboardButton(
             text="🔙 Вернуться к проводнику",
             url=return_url
         )
@@ -108,6 +108,7 @@ async def successful_payment(message: types.Message):
         "Нажмите кнопку ниже, чтобы продолжить путь 🌷",
         reply_markup=keyboard
     )
+
 # ---- ЗАПУСК ----
 if __name__ == "__main__":
     executor.start_polling(dp)
