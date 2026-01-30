@@ -54,13 +54,11 @@ async def start(message: types.Message):
         InlineKeyboardButton("🔥 Нера — 1090 ⭐", callback_data="buy_nera"),
         InlineKeyboardButton("💎 Все проводники — 1990 ⭐", callback_data="buy_all"),
     )
-
     await message.answer(
         "💗 Оплата доступа\n\n"
         "Выберите проводника — оплата проходит прямо в Telegram ⭐",
         reply_markup=keyboard
     )
-
 # ---- ОТПРАВКА INVOICE ----
 @dp.callback_query_handler(lambda c: c.data.startswith("buy_"))
 async def send_invoice(callback: types.CallbackQuery):
