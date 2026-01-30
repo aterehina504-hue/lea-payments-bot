@@ -1,5 +1,8 @@
 import os
 import asyncio
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import (
@@ -10,12 +13,16 @@ from aiogram.types import (
 )
 from aiogram.enums import ContentType
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-MAIN_BOT_URL = "https://t.me/leya_tocka_bot"
+
+# ====== НАСТРОЙКИ ======
+BOT_TOKEN = os.getenv("BOT_TOKEN")  # токен платёжного бота
+MAIN_BOT_URL = "https://t.me/leya_tocka_bot"  # основной бот
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
+
+# ====== ПРОВОДНИКИ ======
 GUIDES = {
     "leya": {
         "title": "Лея — бережный ИИ-проводник",
@@ -44,9 +51,11 @@ GUIDES = {
     },
 }
 
+
+# ====== /start ======
 @dp.message(Command("start"))
 async def start(message: types.Message):
-    kb = InlineKeyboardMarkup(inline_keyboard=[
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🌷 Лея — 490 ⭐", callback_data="buy_leya")],
         [InlineKeyboardButton(text="🌸 Элира — 690 ⭐", callback_data="buy_elira")],
         [InlineKeyboardButton(text="🌼 Амира — 890 ⭐", callback_data="buy_amira")],
@@ -55,12 +64,15 @@ async def start(message: types.Message):
     ])
 
     await message.answer(
-        "💗 Оплата доступа\n\nВыберите проводника:",
-        reply_markup=kb,
+        "💗 Оплата доступа\n\n"
+        "Выберите проводника — оплата проходит прямо в Telegram ⭐",
+        reply_markup=keyboard,
     )
 
+
+# ====== СОЗДАНИЕ СЧЁТА ======
 @dp.callback_query()
-async def handle_buy(callback: types.CallbackQuery):
+async def send_invoice(callback: types.CallbackQuery):
     if not callback.data.startswith("buy_"):
         return
 
@@ -72,32 +84,56 @@ async def handle_buy(callback: types.CallbackQuery):
         title=guide["title"],
         description=guide["description"],
         payload=f"{key}_access",
-        currency="XTR",
+        currency="XTR",  # Telegram Stars
         prices=[LabeledPrice(label="Доступ", amount=guide["price"])],
     )
 
+
+# ====== ПОДТВЕРЖДЕНИЕ ОПЛАТЫ ======
 @dp.pre_checkout_query()
 async def pre_checkout(query: PreCheckoutQuery):
     await query.answer(ok=True)
 
+
+# ====== ПОСЛЕ ОПЛАТЫ ======
 @dp.message(lambda m: m.content_type == ContentType.SUCCESSFUL_PAYMENT)
-async def success(message: types.Message):
+async def successful_payment(message: types.Message):
     payload = message.successful_payment.invoice_payload
-    key = payload.replace("_access", "")
+    guide_key = payload.replace("_access", "")
 
-    url = f"{MAIN_BOT_URL}?start={key}"
+    return_url = f"{MAIN_BOT_URL}?start={guide_key}"
 
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔙 Вернуться к проводнику", url=url)]
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Вернуться к проводнику", url=return_url)]
     ])
 
     await message.answer(
-        "💗 Оплата прошла успешно!\nДоступ активирован.",
-        reply_markup=kb,
+        "💗 Оплата прошла успешно.\n"
+        "Доступ активирован.\n\n"
+        "Нажмите кнопку ниже, чтобы продолжить путь 🌷",
+        reply_markup=keyboard,
     )
 
+
+# ====== ФИКТИВНЫЙ HTTP-СЕРВЕР ДЛЯ RENDER FREE ======
+class DummyHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OK")
+
+
+def run_dummy_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), DummyHandler)
+    server.serve_forever()
+
+
+# ====== ЗАПУСК ======
 async def main():
+    threading.Thread(target=run_dummy_server, daemon=True).start()
     await dp.start_polling(bot)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
