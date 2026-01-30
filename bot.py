@@ -81,15 +81,15 @@ async def send_invoice(callback: types.CallbackQuery):
     key = callback.data.replace("buy_", "")
     guide = GUIDES[key]
 
-    await bot.send_invoice(
-        chat_id=callback.from_user.id,
-        title=guide["title"],
-        description=guide["description"],
-        payload=f"{key}_access",
-        currency="XTR",
-        prices=[LabeledPrice(label="Доступ", amount=guide["price"])],
-        provider_token="",
-    )
+await bot.send_invoice(
+    chat_id=callback.from_user.id,
+    title=guide["title"],
+    description=guide["description"],
+    payload=f"{key}_access",
+    provider_token="",          # 🔥 ОБЯЗАТЕЛЬНО
+    currency="XTR",             # Telegram Stars
+    prices=[LabeledPrice(label="Доступ", amount=guide["price"])],
+)
 
 # ====== ПОДТВЕРЖДЕНИЕ ОПЛАТЫ ======
 @dp.pre_checkout_query()
@@ -139,4 +139,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
