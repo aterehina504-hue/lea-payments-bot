@@ -140,10 +140,24 @@ def run_dummy_server():
 async def main():
     threading.Thread(target=run_dummy_server, daemon=True).start()
     await dp.start_polling(bot)
+    
+    import threading
+from flask import Flask
 
+app = Flask(__name__)
+
+@app.route("/")
+def health():
+    return "OK", 200
+
+def run_flask():
+    app.run(host="0.0.0.0", port=8080)
+
+threading.Thread(target=run_flask).start()
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
