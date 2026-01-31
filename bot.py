@@ -1,3 +1,4 @@
+from aiohttp import web
 import os
 import asyncio
 
@@ -119,10 +120,27 @@ async def success(message: types.Message):
         reply_markup=keyboard
     )
 
+async def healthcheck(request):
+    return web.Response(text="OK")
+
+async def start_webserver():
+    app = web.Application()
+    app.router.add_get("/", healthcheck)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+
+    port = int(os.getenv("PORT", 8080))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+
 # ======================
 # MAIN
 # ======================
 async def main():
+    await bot.delete_webhook(drop_pending_updates=True)
+    async def main():
+    await start_webserver()  # ← важно
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
