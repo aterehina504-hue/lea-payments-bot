@@ -1,7 +1,5 @@
 import os
 import asyncio
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
@@ -12,152 +10,121 @@ from aiogram.types import (
     PreCheckoutQuery,
 )
 from aiogram.enums import ContentType
+from dotenv import load_dotenv
 
+# ======================
+# ENV
+# ======================
+load_dotenv()
+BOT_TOKEN = os.getenv("PAYMENT_BOT_TOKEN")
+if not BOT_TOKEN:
+    raise RuntimeError("PAYMENT_BOT_TOKEN is not set")
 
-# ====== НАСТРОЙКИ ======
-BOT_TOKEN = os.getenv("BOT_TOKEN")  # токен платёжного бота
-MAIN_BOT_URL = "https://t.me/leya_tocka_bot"  # основной бот
+MAIN_BOT_USERNAME = "leya_tocka_bot"  # без @
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-
-# ====== ПРОВОДНИКИ ======
-GUIDES = {
+# ======================
+# PRODUCTS
+# ======================
+PRODUCTS = {
     "leya": {
         "title": "Лея — бережный ИИ-проводник",
-        "description": "Поддержка и внутренняя опора 🤍\nДоступ навсегда",
-        "price": 490,
+        "description": "Поддержка и внутренняя опора 🤍\nДоступ 7 дней",
+        "price": 290,
     },
     "elira": {
         "title": "Элира — путь к желаниям",
-        "description": "Контакт с желаниями 🌸\nДоступ навсегда",
-        "price": 690,
+        "description": "Контакт с желаниями 🌸\nДоступ 7 дней",
+        "price": 590,
     },
     "amira": {
         "title": "Амира — путь к самоценности",
-        "description": "Внутренняя ценность 🌼\nДоступ навсегда",
-        "price": 890,
+        "description": "Внутренняя ценность 🌼\nДоступ 7 дней",
+        "price": 390,
     },
     "nera": {
         "title": "Нера — путь к женской силе",
-        "description": "Энергия и проявленность 🔥\nДоступ навсегда",
-        "price": 1090,
-    },
-    "all": {
-        "title": "Все проводники — полный доступ",
-        "description": "Лея • Элира • Амира • Нера\nНавсегда 🤍",
-        "price": 1990,
+        "description": "Энергия и проявленность 🔥\nДоступ 7 дней",
+        "price": 790,
     },
 }
 
-
-# ====== /start ======
+# ======================
+# START
+# ======================
 @dp.message(Command("start"))
 async def start(message: types.Message):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🌷 Лея — 490 ⭐", callback_data="buy_leya")],
-        [InlineKeyboardButton(text="🌸 Элира — 690 ⭐", callback_data="buy_elira")],
-        [InlineKeyboardButton(text="🌼 Амира — 890 ⭐", callback_data="buy_amira")],
-        [InlineKeyboardButton(text="🔥 Нера — 1090 ⭐", callback_data="buy_nera")],
-        [InlineKeyboardButton(text="💎 Все проводники — 1990 ⭐", callback_data="buy_all")],
+        [InlineKeyboardButton(text=f"{p['title']} — {p['price']} ⭐", callback_data=f"buy_{k}")]
+        for k, p in PRODUCTS.items()
     ])
 
     await message.answer(
         "💗 Оплата доступа\n\n"
         "Выберите проводника — оплата проходит прямо в Telegram ⭐",
-        reply_markup=keyboard,
+        reply_markup=keyboard
     )
 
+# ======================
+# INVOICE
+# ======================
+@dp.callback_query(lambda c: c.data.startswith("buy_"))
+async def buy(callback: types.CallbackQuery):
+    key = callback.data.replace("buy_", "")
+    product = PRODUCTS.get(key)
 
-# ====== СОЗДАНИЕ СЧЁТА ======
-@dp.callback_query()
-async def send_invoice(callback: types.CallbackQuery):
-    if not callback.data.startswith("buy_"):
+    if not product:
+        await callback.answer("Товар не найден", show_alert=True)
         return
 
-    await callback.answer()  # чтобы не было "часиков"
-
-    key = callback.data.replace("buy_", "")
-    guide = GUIDES[key]
+    await callback.answer()
 
     await bot.send_invoice(
         chat_id=callback.from_user.id,
-        title=guide["title"],
-        description=guide["description"],
+        title=product["title"],
+        description=product["description"],
         payload=f"{key}_access",
-        provider_token="",          # 🔥 ОБЯЗАТЕЛЬНО
-        currency="XTR",             # Telegram Stars
-        prices=[
-            LabeledPrice(
-                label="Доступ",
-                amount=guide["price"]
-            )
-        ],
+        provider_token="",  # ⭐ Telegram Stars
+        currency="XTR",
+        prices=[LabeledPrice(label="Доступ", amount=product["price"])],
     )
 
-# ====== ПОДТВЕРЖДЕНИЕ ОПЛАТЫ ======
+# ======================
+# PRE-CHECKOUT
+# ======================
 @dp.pre_checkout_query()
 async def pre_checkout(query: PreCheckoutQuery):
     await query.answer(ok=True)
 
-
-# ====== ПОСЛЕ ОПЛАТЫ ======
+# ======================
+# SUCCESS
+# ======================
 @dp.message(lambda m: m.content_type == ContentType.SUCCESSFUL_PAYMENT)
-async def successful_payment(message: types.Message):
+async def success(message: types.Message):
     payload = message.successful_payment.invoice_payload
     guide_key = payload.replace("_access", "")
 
-    return_url = f"{MAIN_BOT_URL}?start={guide_key}"
+    url = f"https://t.me/{MAIN_BOT_USERNAME}?start={guide_key}"
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔙 Вернуться к проводнику", url=return_url)]
+        [InlineKeyboardButton(text="🔙 Вернуться к проводнику", url=url)]
     ])
 
     await message.answer(
         "💗 Оплата прошла успешно.\n"
         "Доступ активирован.\n\n"
         "Нажмите кнопку ниже, чтобы продолжить путь 🌷",
-        reply_markup=keyboard,
+        reply_markup=keyboard
     )
 
-
-# ====== ФИКТИВНЫЙ HTTP-СЕРВЕР ДЛЯ RENDER FREE ======
-class DummyHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"OK")
-
-
-def run_dummy_server():
-    port = int(os.environ.get("PORT", 10000))
-    server = HTTPServer(("0.0.0.0", port), DummyHandler)
-    server.serve_forever()
-
-
-# ====== ЗАПУСК ======
+# ======================
+# MAIN
+# ======================
 async def main():
-    threading.Thread(target=run_dummy_server, daemon=True).start()
+    await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
-    
-    import threading
-from flask import Flask
-
-app = Flask(__name__)
-
-@app.route("/")
-def health():
-    return "OK", 200
-
-def run_flask():
-    app.run(host="0.0.0.0", port=8080)
-
-threading.Thread(target=run_flask).start()
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
-
-
